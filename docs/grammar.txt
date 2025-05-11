@@ -1,0 +1,120 @@
+// ULCE-Lang Grammar (PEG Format)
+
+// Identifiers and Literals
+
+identifier = letter { letter | digit | '_' }
+
+number = digit+ [ '.' digit+ ]
+
+string = '"' { ~'"' any } '"'
+
+letter = [a-zA-Z]
+
+digit = [0-9]
+
+// Top-Level Structure
+
+Program = { Statement }
+
+Statement = Import | Declaration
+
+Import = 'import' identifier [ 'as' identifier ] ';'
+
+Declaration = TypeDecl | AgentDecl
+
+// Types
+
+TypeDecl = 'type' identifier [ '*' ] [ GenericParams ] '=' TypeExpr { 'and' TypeDeclSuffix } ';'
+
+TypeDeclSuffix = identifier [ '*' ] [ GenericParams ] '=' TypeExpr
+
+GenericParams = '<' GenericParam { ',' GenericParam } '>'
+
+GenericParam = identifier [ ':' TypeExpr ]
+
+TypeExpr = RecordType
+| VariantUnion
+| FunctionType
+| GenericType
+| BasicType
+| LiteralType
+| identifier [ '<' TypeExpr { ',' TypeExpr } '>' ]
+
+RecordType = 'rect' '{' FieldList '}'
+
+FieldList = [ Field { ',' Field } ]
+
+Field = identifier [ '?' ] ':' TypeExpr
+
+VariantUnion = Variant { '|' Variant }
+
+Variant = identifier '(' FieldList ')'
+
+FunctionType = TypeExpr '->' TypeExpr
+
+GenericType = identifier '<' TypeExpr { ',' TypeExpr } '>'
+
+BasicType = 'string' | 'int' | 'float' | 'bool'
+
+LiteralType = string | number | 'true' | 'false'
+
+// Agents
+
+AgentDecl = 'agent' identifier [ GenericParams ] '[' TypeExpr ',' TypeExpr ']' '(' [ ParamList ] ')' '{' { AgentBody } '}'
+
+AgentBody = StateDecl | InitBlock | Method | Handler
+
+StateDecl = 'let' identifier ':' TypeExpr '=' Expression ';'
+
+InitBlock = 'init' Block
+
+Method = 'fn' identifier [ '*' ] '(' [ ParamList ] ')' [ ':' TypeExpr ] '=>' ( Expression | Block )
+
+Handler = 'on' identifier ':' TypeExpr '=>' Expression ';'
+
+ParamList = Param { ',' Param }
+
+Param = identifier ':' TypeExpr
+
+// Expressions
+
+Expression = Literal
+| identifier
+| Expression BinaryOp Expression
+| 'if' Expression 'then' Expression 'else' Expression
+| 'match' Expression '{' { MatchCase } '}'
+| 'emit' '(' identifier ',' Expression ')'
+| 'println' '(' Expression ')'
+| 'rect' '{' FieldAssignments '}'
+| LambdaExpr
+| ForExpr
+| WhileExpr
+| OptionalExpr
+| Block
+
+LambdaExpr = identifier '=>' Expression
+| '(' [ ParamList ] ')' '=>' Expression
+| '(' [ ParamList ] ')' '=>' Block
+
+ForExpr = 'for' identifier 'in' Expression Block
+
+WhileExpr = 'while' Expression Block
+
+OptionalExpr = Expression '?'
+
+MatchCase = 'case' Pattern ':' Expression
+
+Pattern = identifier [ '(' FieldList ')' ]
+
+FieldAssignments = [ FieldAssignment { ',' FieldAssignment } ]
+
+FieldAssignment = identifier ':' Expression
+
+Block = '{' { Expression } '}'
+
+// Literals and Operators
+
+Literal = number | string | 'true' | 'false'
+
+BinaryOp = '+' | '-' | '*' | '/' | '==' | '!=' | '<' | '>' | '<=' | '>=' | '&&' | '||'
+

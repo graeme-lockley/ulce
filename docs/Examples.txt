@@ -1,0 +1,146 @@
+
+agent PrimeChecker(val x: Int) {
+  input stdin: Stream<Int>
+  output stdout: Stream<Bool>
+
+  on n: Int over stdin => {
+    emit(stdout, isPrime(n))
+  }
+
+  fn isPrime(n: Int): Bool => {
+    if (n < 2) return False
+    if (n == 2 || n == 3) return True
+    if (n % 2 == 0 || n % 3 == 0) return False
+
+    var i = 5
+    while (i * i <= n) {
+        if (n % i == 0 || n % (i + 2) == 0) return False
+        i += 6
+    }
+    return True
+  }
+}
+
+
+The problem with this approach is that it requires that the entire agent needs to be constructed all at once.  
+It isn't possible to incrementally add pieces into the agent bit by bit... almost incrementally.  Thinking of 
+this from a notebook perspective.
+
+An agent, in this context, state can not be changed from the "outside".  The functions, if public, can be called however, 
+when being called, will be folded into the event handlers, but never will 2 threads be active in an agent at a point in time.
+
+
+Let's think about this as an example.
+
+val fileReader = rootAgent.create(FileReader, "/fs/reader")
+
+fn readFile(fileName: String, to: Stream<Char>) {
+    emit(fileReader, {fileName: fileName, out: to})
+}
+
+type FileReaderInput = {
+    fileName: String,
+    out: Stream<Char>
+}
+
+agent FileReader {
+  input stdin: Stream<String | FileReaderInput>
+  output stdout: Stream<Char>
+
+  on fileName: String => {
+    writeTo(fileName, stdout)
+  }
+
+  on input: FileReadInput => {
+    writeTo(input.fileName, input.out)
+  }
+
+  fn writeTo(fileName: String, out: Stream<Char>) {
+    // some primitive agent which will do this for me.  This s
+  }
+}
+
+We end up with nothing more than dependencies between declarations and files.
+
+
+agent Merge<A, B, C, D> {
+  input stdin: Stream<A | C>
+  output stdout: Stream<B | D>
+
+  let leftObs: Observer
+  let rightObs: Observer
+
+  init (left: Agent<A, B>, right: Agent<C, D>) {
+    leftObs = left.stdout.observe(fn(msg: B) => emit(stdout, msg))
+    rightObs = right.stdout.observe(fn(msg: D) => emit(stdout, msg))
+  }
+
+  deinit() {
+    leftObs.cancel()
+    rightObs.cancel()
+  }
+
+  on input: A => emit(left, input)
+  on input: C => emit(right, input)
+}
+
+
+type Left<A> = Left(v: A)
+type Right<A> = Right(v: A)
+type ZipInput<A, B> = Left<A> | Right<B>
+
+agent Zip<A, B>[ZipInput<A, B>, B](left: Agent<Any, A>, right: Agent<Any, B>) =
+  let leftBuffer: List<A> = []
+  let rightBuffer: List<B> = []
+
+  let leftObs = left.stdout.observe(fn(msg: A) => emit(self, Left(msg)))
+  let rightObs = right.stdout.observe(fn(msg: B) => emit(self, Right(msg)))
+
+  deinit() =
+    leftObs.cancel()
+    rightObs.cancel()
+
+  on left: Left<A> =>
+    leftBuffer = leftBuffer ++ [left.v]
+    tryEmitPair()
+
+  on right: Right<B> =>
+    rightBuffer = rightBuffer ++ [right.v]
+    tryEmitPair()
+
+  fn tryEmitPair() =
+    if (!leftBuffer.isEmpty() && !rightBuffer.isEmpty())
+      let a = leftBuffer.head()
+      let b = rightBuffer.head()
+      leftBuffer = leftBuffer.tail()
+      rightBuffer = rightBuffer.tail()
+
+      emit([a, b])
+
+
+fn compose<A, B, C> (f: (A) -> B, g: (B) -> C): (A) -> C =
+  (n) => g(f(n))
+
+... compose: fn <A, B, C>((A) -> B, (B) -> C): (A) -> C
+
+agent Adder[Int, Int](n: Int) =
+  on v => emit(v * n)
+... Adder: agent[Int, Int](Int)
+
+let x = Adder(10)
+
+x.out.observe(fn(n) = println(x))
+
+x.send(20)
+
+
+agent Mapper<A, B>[A, B](f: (A) -> B) =
+  on v: A => emit(f(v))
+
+
+fun odd(n: Int): Bool = if n == 0 then False else even(n - 1)
+and even(n: Int): Bool = if n == 0 then True else odd(n - 1)
+
+type Nil = Nil()
+ and Cons<X> = Cons(car: X, cdr: List<X>)
+ and List<X> = Cons<X> | Nil
