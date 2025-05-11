@@ -1,16 +1,24 @@
-// ULCE-Lang Grammar (PEG Format)
-
-// Identifiers and Literals
-
-identifier = letter { letter | digit | '_' }
-
-number = digit+ [ '.' digit+ ]
-
-string = '"' { ~'"' any } '"'
+//// Scanner.llld
 
 letter = [a-zA-Z]
-
 digit = [0-9]
+
+LiteralChar = chr(39) (char | chr(34) | '\' ('\' | 'n' | chr(39))) chr(39);
+
+LiteralFloat = ['-'] digits '.' digits [('e' | 'E') ['-'] digits];
+LiteralInt = ['-'] digits;
+LiteralString = '"' {char | chr(39) | '\' ('\' | 'n' | '"' | ("x" digits ';'))} '"';
+
+LowerID = lowerID {digit | id};
+UpperID = upperID {digit | id};
+
+char = chr(32)-chr(33) + chr(35)-chr(38) + chr(40)-chr(91) + chr(93)-chr(255);
+digit = '0'-'9';
+digits = digit {digit};
+id = 'A'-'Z' + 'a'-'z';
+lowerID = 'a'-'z';
+upperID = 'A'-'Z';
+cr = chr(10);
 
 // Top-Level Structure
 
@@ -18,19 +26,19 @@ Program = { Statement }
 
 Statement = Import | Declaration
 
-Import = 'import' identifier [ 'as' identifier ] ';'
+Import = 'import' Identifier [ 'as' Identifier ] ';'
 
 Declaration = TypeDecl | AgentDecl
 
 // Types
 
-TypeDecl = 'type' identifier [ '*' ] [ GenericParams ] '=' TypeExpr { 'and' TypeDeclSuffix } ';'
+TypeDecl = 'type' Identifier [ '*' ] [ GenericParams ] '=' TypeExpr { 'and' TypeDeclSuffix } ';'
 
-TypeDeclSuffix = identifier [ '*' ] [ GenericParams ] '=' TypeExpr
+TypeDeclSuffix = Identifier [ '*' ] [ GenericParams ] '=' TypeExpr
 
 GenericParams = '<' GenericParam { ',' GenericParam } '>'
 
-GenericParam = identifier [ ':' TypeExpr ]
+GenericParam = Identifier [ ':' TypeExpr ]
 
 TypeExpr = RecordType
 | VariantUnion
@@ -38,21 +46,21 @@ TypeExpr = RecordType
 | GenericType
 | BasicType
 | LiteralType
-| identifier [ '<' TypeExpr { ',' TypeExpr } '>' ]
+| Identifier [ '<' TypeExpr { ',' TypeExpr } '>' ]
 
 RecordType = 'rect' '{' FieldList '}'
 
 FieldList = [ Field { ',' Field } ]
 
-Field = identifier [ '?' ] ':' TypeExpr
+Field = Identifier [ '?' ] ':' TypeExpr
 
 VariantUnion = Variant { '|' Variant }
 
-Variant = identifier '(' FieldList ')'
+Variant = Identifier '(' FieldList ')'
 
 FunctionType = TypeExpr '->' TypeExpr
 
-GenericType = identifier '<' TypeExpr { ',' TypeExpr } '>'
+GenericType = Identifier '<' TypeExpr { ',' TypeExpr } '>'
 
 BasicType = 'string' | 'int' | 'float' | 'bool'
 
@@ -60,30 +68,30 @@ LiteralType = string | number | 'true' | 'false'
 
 // Agents
 
-AgentDecl = 'agent' identifier [ GenericParams ] '[' TypeExpr ',' TypeExpr ']' '(' [ ParamList ] ')' '{' { AgentBody } '}'
+AgentDecl = 'agent' Identifier [ GenericParams ] '[' TypeExpr ',' TypeExpr ']' '(' [ ParamList ] ')' '{' { AgentBody } '}'
 
 AgentBody = StateDecl | InitBlock | Method | Handler
 
-StateDecl = 'let' identifier ':' TypeExpr '=' Expression ';'
+StateDecl = 'let' Identifier ':' TypeExpr '=' Expression ';'
 
 InitBlock = 'init' Block
 
-Method = 'fn' identifier [ '*' ] '(' [ ParamList ] ')' [ ':' TypeExpr ] '=>' ( Expression | Block )
+Method = 'fn' Identifier [ '*' ] '(' [ ParamList ] ')' [ ':' TypeExpr ] '=>' ( Expression | Block )
 
-Handler = 'on' identifier ':' TypeExpr '=>' Expression ';'
+Handler = 'on' Identifier ':' TypeExpr '=>' Expression ';'
 
 ParamList = Param { ',' Param }
 
-Param = identifier ':' TypeExpr
+Param = Identifier ':' TypeExpr
 
 // Expressions
 
 Expression = Literal
-| identifier
+| Identifier
 | Expression BinaryOp Expression
 | 'if' Expression 'then' Expression 'else' Expression
 | 'match' Expression '{' { MatchCase } '}'
-| 'emit' '(' identifier ',' Expression ')'
+| 'emit' '(' Identifier ',' Expression ')'
 | 'println' '(' Expression ')'
 | 'rect' '{' FieldAssignments '}'
 | LambdaExpr
@@ -92,11 +100,11 @@ Expression = Literal
 | OptionalExpr
 | Block
 
-LambdaExpr = identifier '=>' Expression
+LambdaExpr = Identifier '=>' Expression
 | '(' [ ParamList ] ')' '=>' Expression
 | '(' [ ParamList ] ')' '=>' Block
 
-ForExpr = 'for' identifier 'in' Expression Block
+ForExpr = 'for' Identifier 'in' Expression Block
 
 WhileExpr = 'while' Expression Block
 
@@ -104,11 +112,11 @@ OptionalExpr = Expression '?'
 
 MatchCase = 'case' Pattern ':' Expression
 
-Pattern = identifier [ '(' FieldList ')' ]
+Pattern = Identifier [ '(' FieldList ')' ]
 
 FieldAssignments = [ FieldAssignment { ',' FieldAssignment } ]
 
-FieldAssignment = identifier ':' Expression
+FieldAssignment = Identifier ':' Expression
 
 Block = '{' { Expression } '}'
 

@@ -1,0 +1,292 @@
+uses "./Scanner.llld"
+
+Program
+    : { Statement }
+    ;
+
+Statement
+    : Import 
+    | Declaration
+    ;
+
+Import
+    : 'import' LiteralString 'as' UpperID  ';'
+    ;
+
+Declaration
+    : TypeDecl 
+    | AgentDecl
+    ;
+
+// Types
+
+TypeDecl
+    : 'type' TypeDeclSuffix {'and' TypeDeclSuffix} ';'
+    ;
+
+TypeDeclSuffix
+    : UpperID ['*'] [GenericParams] '=' TypeExpr
+    ;
+
+GenericParams
+    : '<' GenericParam {',' GenericParam} '>'
+    ;
+
+GenericParam
+    : UpperID [':' TypeExpr]
+    ;
+
+TypeExpr
+    : AndTypeExpr {'|' AndTypeExpr}
+    ;
+
+AndTypeExpr
+    : OptionalTypeExpr {'&' OptionalTypeExpr}
+    ;
+
+OptionalTypeExpr
+    : TypeFactor ['?']
+    ;
+
+TypeFactor
+    : '(' TypeExpr {'*' TypeExpr} ')'
+    | RecordType
+    | FunctionType
+    | GenericType
+    | LiteralType
+    | UpperID [IdentifierSuffix]
+    ;
+
+RecordType
+    : 'rect' '{' [FieldList] '}'
+    ;
+
+FieldList
+    : Field {',' Field}
+    ;
+
+Field
+    : LowerID [ '?' ] ':' TypeExpr
+    ;
+
+FunctionType
+    : '(' [TypeExpr {',' TypeExpr}] ')' '->' TypeExpr
+    ;
+
+GenericType
+    : UpperID '<' TypeExpr { ',' TypeExpr } '>'
+    ;
+
+LiteralType
+    : LiteralChar 
+    | LiteralFloat 
+    | LiteralInt 
+    | LiteralString 
+    | 'True' 
+    | 'False'
+    ;
+
+IdentifierSuffix
+    : ['<' TypeExpr { ',' TypeExpr } '>']
+    | ['(' [FieldList] ')'] 
+    ;
+
+// Agents
+
+AgentDecl
+    : 'agent' UpperID [GenericParams] '[' TypeExpr ',' TypeExpr ']' '(' [ ParamList ] ')' '{' { AgentBody } '}'
+    ;
+
+AgentBody
+    : StateDecl 
+    | InitBlock 
+    | Method 
+    | Handler
+    ;
+
+StateDecl
+    : 'let' LowerID [':' TypeExpr] '=' Expression ';'
+    | 'const' LowerID [':' TypeExpr] '=' Expression ';'
+    ;
+
+InitBlock
+    : 'init' Block
+    ;
+
+Method
+    : 'fun' LowerID ['*'] [GenericParams] '(' [ParamList] ')' [':' TypeExpr] '=>' Expression
+    ;
+
+Handler
+    : 'on' LowerID [':' TypeExpr] '=>' Expression ';'
+    ;
+
+ParamList
+    : Param {',' Param}
+    ;
+
+Param
+    : LowerID [':' TypeExpr]
+    ;
+
+// Expressions
+
+Expression
+    : EmitExpression
+    | 'if' Expression 'then' Expression 'else' Expression
+    | 'match' Expression '{' { MatchCase } '}'
+    | 'println' '(' Expression ')'
+    | ForExpr
+    | WhileExpr
+    ;
+
+MatchCase
+    : 'case' Pattern [',' Expression] '=>' Expression
+    ;
+
+EmitExpression
+    : LogicalOrExpr ['!' Expression]
+    ;
+
+LogicalOrExpr
+    : LogicalAndExpr {LogicalOrExprOp LogicalAndExpr}
+    ;
+
+LogicalOrExprOp
+    : '||'
+    ;
+
+LogicalAndExpr
+    : EqualityExpr {LogicalAndExprOp EqualityExpr}
+    ;
+
+LogicalAndExprOp
+    : '&&'
+    ;
+
+EqualityExpr
+    : RelationalExpr [EqualityExprOp RelationalExpr]
+    ;
+
+EqualityExprOp
+    : '=='
+    | '!='
+    ;
+
+RelationalExpr
+    : AdditiveExpr [RelationalExprOp AdditiveExpr]
+    ;
+
+RelationalExprOp
+    : '<'
+    | '>'
+    | '<='
+    | '>='
+    ;
+
+AdditiveExpr
+    : MultiplicativeExpr {AdditiveExprOp MultiplicativeExpr}
+    ;
+
+AdditiveExprOp
+    : '+'
+    | '-'
+    ;
+
+MultiplicativeExpr
+    : TypedExpression {MultiplicativeExprOp TypedExpression}
+    ;
+
+MultiplicativeExprOp
+    : '*'
+    | '/'
+    ;
+
+TypedExpression
+    : AssignmentExpression [':' TypeExpr]
+    ;
+
+AssignmentExpression
+    : QualifiedExpression [":=" Expression]
+    ;
+
+QualifiedExpression
+    : Factor {QualifiedExpressionSuffix}
+    ;
+
+QualifiedExpressionSuffix
+    : "(" [Expression {"," Expression}] ")"
+    | "[" (':' [Expression] | [Expression {":" Expression}]) "]"
+    ;
+
+Factor
+    : Literal
+    | LowerID
+    | 'rect' '{' FieldAssignments '}'
+    | '[' [["..."] Expression {"," ["..."] Expression}] ']'
+    | LambdaExpr
+    | Block
+    | '(' Expression ')'
+    | '!' Expression
+    ;
+
+LambdaExpr
+    : 'fun' [GenericParams] '(' [ParamList] ')' '=>' Expression
+    ;
+
+ForExpr
+    : 'for' LowerID 'in' Expression Block
+    ;
+
+WhileExpr
+    : 'while' Expression Block
+    ;
+
+Pattern
+    : PatterTerm [':' TypeExpr]
+    ;
+
+PatterTerm
+    : LowerID
+    | UpperID [ '(' [PatternCommaList] ')' ]
+    | Literal
+    | '(' PatternCommaList ')'
+    | '{' PatternFieldList '}'
+    ;
+
+PatternCommaList
+    : Pattern {',' Pattern}
+    ;
+
+PatternFieldList
+    : PatternField {',' PatternField}
+    ;
+
+PatternField
+    : LowerID [':' Pattern]
+    ;
+
+FieldAssignments
+    : [ FieldAssignment { ',' FieldAssignment } ]
+    ;
+
+FieldAssignment
+    : LowerID ':' Expression
+    ;
+
+Block
+    : '{' { Expression } '}'
+    ;
+
+// Literals and Operators
+
+Literal
+    : LiteralChar 
+    | LiteralFloat
+    | LiteralInt
+    | LiteralString 
+    | 'True' 
+    | 'False' 
+    | 'Undefined'
+    ;
+

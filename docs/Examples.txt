@@ -129,7 +129,7 @@ agent Adder[Int, Int](n: Int) =
 
 let x = Adder(10)
 
-x.out.observe(fn(n) = println(x))
+x.out.observe(fn(n) => println(x))
 
 x.send(20)
 
@@ -144,3 +144,7 @@ and even(n: Int): Bool = if n == 0 then True else odd(n - 1)
 type Nil = Nil()
  and Cons<X> = Cons(car: X, cdr: List<X>)
  and List<X> = Cons<X> | Nil
+
+
+import "string.ulce" as String
+
