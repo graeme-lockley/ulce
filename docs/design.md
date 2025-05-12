@@ -46,7 +46,7 @@ Thus, the UCLE system adopts the term **agent** to describe its fundamental unit
   * Declared as `agent Name<T>[A, B](params...) { ... }`
   * Top-level `let` declarations for static or computed state
   * An optional `init { ... }` block for imperative setup
-  * Declarative message handlers (`on`) and public methods (`fn`)
+  * Declarative message handlers (`on`) and public methods (`fun`)
 
 ### 2.3 Streams
 
@@ -104,7 +104,7 @@ agent Name<T1, T2>[Input, Output](params...) {
   let ...
   init { ... }
   on ... => ...
-  fn ... => ...
+  fun ... => ...
 }
 ```
 
@@ -112,17 +112,17 @@ agent Name<T1, T2>[Input, Output](params...) {
 
 * Structural, not nominal
 * Open union types (e.g. `A | B`) support subtype extensibility
-* Record types (e.g. `rect { x: Int, y: Int }`)
+* Record types (e.g. `rec { x: Int, y: Int }`)
 * Function types `(A) → B`
 * Optional values via `?`:
 
-  * Optional fields: `rect { name: String, age?: Int }`
+  * Optional fields: `rec { name: String, age?: Int }`
   * Optional expressions: `val maybe = value?`
 * Tagged variant sugar:
 
   ```ulce
-  Left(v: A)  ≡  rect { tag: "Left", v: A }
-  Right(v: B) ≡  rect { tag: "Right", v: B }
+  Left(v: A)  ≡  rec { tag: "Left", v: A }
+  Right(v: B) ≡  rec { tag: "Right", v: B }
   ```
 * Literal types allowed in type expressions: e.g. `tag: "Ok"`, `tag: "Err"`
 * Pattern matching on structural tags
@@ -136,7 +136,7 @@ agent Name<T1, T2>[Input, Output](params...) {
 
 ```ulce
 agent Mapper<A, B>[A, B](f: (A) -> B) {
-  on v: A => emit(f(v))
+  on v: A => ! f(v)
 }
 ```
 
@@ -153,7 +153,7 @@ agent Logger<T>[T, T](prefix: String) {
   on msg: T => {
     println("$prefix [$count]: $msg")
     count = count + 1
-    emit(msg)
+    ! msg
   }
 }
 ```
@@ -168,7 +168,7 @@ agent Logger<T>[T, T](prefix: String) {
 
 ### 5.2 Emission and Observation
 
-* `emit(self.out, value)` emits to the output stream
+* `emit(self.out, value)` emits to the output stream.  This can be written as `self.out ! value`as a  shortened form and nod to CSP.
 * `observe(agent, fn)` attaches listeners to output
 
 ### 5.3 Determinism
@@ -194,12 +194,12 @@ agent Logger<T>[T, T](prefix: String) {
 1. **Agents are stream transformers with lifecycle and structure.**
 2. **Type system is structural and open.**
 3. **Tagged union sugar builds extensible records.**
-4. **Optional fields and values use `?`.**
-5. **Record literals use `rect { ... }` for clarity.**
+4. **Optional fields and values use ****************************************************`?`****************************************************.**
+5. **Record literals use **********\`\`********** for clarity.**
 6. **Literal types are valid type expressions for pattern matching.**
 7. **Lifecycle is deterministic and observable.**
-8. **Initialization is declarative (params, let) and procedural (`init`).**
-9. **Recursive types and mutual ADTs are supported via `type` + `and`.**
+8. **Initialization is declarative (params, let) and procedural (********`init`****\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*).**
+9. **Recursive types and mutual ADTs are supported via ****************************************************`type`**************************************************** + ****************************************************`and`****************************************************.**
 10. **Reactive orchestration encourages compositionality.**
 
 ---
