@@ -46,7 +46,7 @@ Thus, the UCLE system adopts the term **agent** to describe its fundamental unit
   * Declared as `agent Name<T>[A, B](params...) { ... }`
   * Top-level `let` declarations for static or computed state
   * An optional `init { ... }` block for imperative setup
-  * Declarative message handlers (`on`) and public methods (`fun`)
+  * Declarative message handlers (`on`) and public methods (`fn`)
 
 ### 2.3 Streams
 
@@ -104,7 +104,7 @@ agent Name<T1, T2>[Input, Output](params...) {
   let ...
   init { ... }
   on ... => ...
-  fun ... => ...
+  fn ... => ...
 }
 ```
 
@@ -112,17 +112,17 @@ agent Name<T1, T2>[Input, Output](params...) {
 
 * Structural, not nominal
 * Open union types (e.g. `A | B`) support subtype extensibility
-* Record types (e.g. `rec { x: Int, y: Int }`)
+* Record types (e.g. `rect { x: Int, y: Int }`)
 * Function types `(A) → B`
 * Optional values via `?`:
 
-  * Optional fields: `rec { name: String, age?: Int }`
+  * Optional fields: `rect { name: String, age?: Int }`
   * Optional expressions: `val maybe = value?`
 * Tagged variant sugar:
 
   ```ulce
-  Left(v: A)  ≡  rec { tag: "Left", v: A }
-  Right(v: B) ≡  rec { tag: "Right", v: B }
+  Left(v: A)  ≡  rect { tag: "Left", v: A }
+  Right(v: B) ≡  rect { tag: "Right", v: B }
   ```
 * Literal types allowed in type expressions: e.g. `tag: "Ok"`, `tag: "Err"`
 * Pattern matching on structural tags
@@ -136,7 +136,7 @@ agent Name<T1, T2>[Input, Output](params...) {
 
 ```ulce
 agent Mapper<A, B>[A, B](f: (A) -> B) {
-  on v: A => ! f(v)
+  on v: A => emit(f(v))
 }
 ```
 
@@ -153,10 +153,47 @@ agent Logger<T>[T, T](prefix: String) {
   on msg: T => {
     println("$prefix [$count]: $msg")
     count = count + 1
-    ! msg
+    emit(msg)
   }
 }
 ```
+
+### 4.3 Combinator Agents
+
+A **combinator agent** is one that reacts to observed output streams rather than listening on `self.in`. These are used for wiring and composing agents into reactive systems.
+
+#### Naming Convention:
+
+| Category      | Prefix | Example   |
+| ------------- | ------ | --------- |
+| Source        | `Gen`  | `GenTime` |
+| Transformer   | –      | `Mapper`  |
+| Combinator    | `Comb` | `CombZip` |
+| Observer/Sink | `Tap`  | `TapLog`  |
+
+#### Template:
+
+```ulce
+agent CombZip<A, B>[Unknown, (A, B)](left: Agent<Any, A>, right: Agent<Any, B>) {
+  let leftBuffer: List<A> = []
+  let rightBuffer: List<B> = []
+
+  let leftObs = left.stdout.observe(fun(msg: A) => { ... })
+  let rightObs = right.stdout.observe(fun(msg: B) => { ... })
+
+  fun deinit() => {
+    leftObs.cancel()
+    rightObs.cancel()
+  }
+}
+```
+
+#### Characteristics:
+
+* No `self.in` usage
+* Driven by observation (`observe(...)`)
+* Often used for coordination, wiring, or combinator logic
+* Output-only behavior
 
 ---
 
@@ -168,7 +205,7 @@ agent Logger<T>[T, T](prefix: String) {
 
 ### 5.2 Emission and Observation
 
-* `emit(self.out, value)` emits to the output stream.  This can be written as `self.out ! value`as a  shortened form and nod to CSP.
+* `emit(self.out, value)` emits to the output stream
 * `observe(agent, fn)` attaches listeners to output
 
 ### 5.3 Determinism
@@ -194,13 +231,52 @@ agent Logger<T>[T, T](prefix: String) {
 1. **Agents are stream transformers with lifecycle and structure.**
 2. **Type system is structural and open.**
 3. **Tagged union sugar builds extensible records.**
-4. **Optional fields and values use ****************************************************`?`****************************************************.**
-5. **Record literals use **********\`\`********** for clarity.**
+4. **Optional fields and values use `?`.**
+5. **Record literals use `rect { ... }` for clarity.**
 6. **Literal types are valid type expressions for pattern matching.**
 7. **Lifecycle is deterministic and observable.**
-8. **Initialization is declarative (params, let) and procedural (********`init`****\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*).**
-9. **Recursive types and mutual ADTs are supported via ****************************************************`type`**************************************************** + ****************************************************`and`****************************************************.**
+8. **Initialization is declarative (params, let) and procedural (`init`).**
+9. **Recursive types and mutual ADTs are supported via `type` + `and`.**
 10. **Reactive orchestration encourages compositionality.**
+11. **Combinator agents enable flexible, input-free stream wiring.**
+
+---
+
+## 8. Relation to Prior Work
+
+UCLE is informed by many streams of programming language and system design research but introduces a novel synthesis that repositions key ideas:
+
+### Actor Model
+
+* Inspired by Hewitt/Agha's message-passing model.
+* UCLE agents differ by being structurally typed, lifecycle-managed, and declaratively wired — unlike traditional opaque actors.
+
+### Functional Reactive Programming (FRP)
+
+* Shares reactivity and stream transformation primitives.
+* Diverges by grounding in compositional agent constructs with initialization and teardown semantics.
+
+### Elm Architecture
+
+* Similar in modeling updates from events.
+* UCLE decentralizes this model, allowing multiple autonomous reactive agents instead of a central loop.
+
+### Rx and Observables
+
+* Aligns with reactive composition and observation semantics.
+* UCLE introduces typed agents with memory, structural typing, and stream lifecycle binding — not present in Rx.
+
+### Dataflow Languages
+
+* UCLE inherits the spirit of wiring boxes and flows but embeds the model in a live-coded, strongly typed, inspectable environment.
+
+### Novel Contributions
+
+* **Optional input stream**: UCLE agents can function without owning `in`, relying instead on observation.
+* **Lifecycle-aware observation**: Observers attach and detach cleanly with `deinit()`.
+* **Declarative wiring** of reactive computation.
+* **Structural typing** and open union models support extensible composition.
+* **Compositional agent design** makes orchestration reusable and analyzable.
 
 ---
 
