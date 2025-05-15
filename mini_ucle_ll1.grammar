@@ -1,0 +1,112 @@
+// ==== PROGRAM STRUCTURE ====
+
+Program        <- Statement*
+
+Statement      <- TypeDecl
+               / LetDecl
+               / ExprStmt
+
+ExprStmt       <- Expression ';'
+
+
+// ==== TYPE DECLARATIONS ====
+
+TypeDecl       <- 'type' SingleTypeDecl {'and' SingleTypeDecl} ';'
+SingleTypeDecl <- TypeName [GenericParams] '=' TypeExpr
+
+GenericParams <- '<' TypeVar (',' TypeVar)* '>'
+TypeVar        <- Identifier
+TypeName       <- Identifier
+
+
+// ==== EXPRESSION STATEMENT ====
+
+LetDecl        <- 'let' SingleLetDecl {'and' SingleLetDecl} ';'
+SingleLetDecl  <- Identifier [GenericParams] ['(' ParamListOpt ')'] [':' TypeExpr] '=>' Expression
+
+// ==== EXPRESSIONS ====
+
+Expression     <- PrimaryExpr ExpressionSuffix*
+
+ExpressionSuffix <- ApplicationSuffix
+                 / AccessSuffix
+ApplicationSuffix <- '(' [ExpressionList] ')'
+AccessSuffix   <- '.' Identifier
+
+PrimaryExpr    <- Lambda
+               / ConstExpr
+               / MatchExpr
+               / RecordLiteral
+               / Identifier
+               / Literal
+               / Parens
+
+Lambda         <- 'fn' '(' ParamListOpt ')' '=>' Expression
+ParamListOpt   <- Param (',' Param)*?
+Param          <- Identifier [':' TypeExpr]
+
+ConstExpr      <- 'const' Identifier '=' Expression 'in' Expression
+
+MatchExpr      <- 'match' Expression '{' MatchArm+ '}'
+MatchArm       <- 'case' Pattern '=>' Expression
+
+// Pattern is now factored to be LL(1)
+Pattern        <- RecordPattern
+               / IdentifierPattern
+               / Literal
+
+IdentifierPattern <- Identifier [PatternArgs]
+PatternArgs    <- '(' [PatternFields] ')'
+
+PatternFields  <- Pattern {',' Pattern}
+
+RecordPattern  <- 'rect' '{' [FieldPatternList] '}'
+FieldPatternList <- FieldPattern {',' FieldPattern}
+FieldPattern   <- Identifier ':' Pattern
+
+ExpressionList <- Expression {',' Expression}
+
+RecordLiteral  <- 'rect' '{' [FieldList] '}'
+FieldList      <- Field {',' Field}
+Field          <- Identifier ':' Expression
+
+Parens         <- '(' Expression ')'
+
+Literal        <- Number / String / Boolean
+
+Number         <- [0-9]+
+String         <- '"' [^"]* '"'
+Boolean        <- 'true' / 'false'
+
+Identifier     <- [a-zA-Z_][a-zA-Z0-9_]*1
+
+
+// ==== TYPES ====
+
+TypeExpr       <- FunctionType
+
+FunctionType   <- UnionType {'->' UnionType'}
+
+UnionType      <- IntersectionType {'|' IntersectionType}
+
+IntersectionType <- PrimaryType {'&' PrimaryType}
+
+PrimaryType    <- TypeNameType
+               / RecordType
+               / ParensType
+               / LiteralType
+
+TypeNameType   <- TypeName [TypeArgs]
+TypeArgs       <- '<' TypeExpr TypeExprRestOpt '>'
+
+TypeExprRestOpt <- ',' TypeExpr TypeExprRestOpt?
+
+RecordType     <- 'rect' '{' [TypeFieldList] '}'
+TypeFieldList  <- TypeField {',' TypeField}
+TypeField      <- Identifier ':' TypeExpr
+
+ParensType     <- '(' TypeExpr ')'
+
+LiteralType    <- String
+               / Boolean
+               / Number
