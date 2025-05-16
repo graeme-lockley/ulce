@@ -1,0 +1,6 @@
+.gradle/
+build/
+.idea/
+
+src/main/kotlin/io
+src/main/kotlin/com/ucle/parser

@@ -1,0 +1,201 @@
+uses "./Scanner.llld";
+
+Program
+    : {Statement}
+    ;
+
+Statement
+    : TypeDecl
+    | LetDecl
+    | ExprStmt
+    ;
+
+ExprStmt
+    : Expression ";"
+    ;
+
+TypeDecl
+    : "type" SingleTypeDecl {"and" SingleTypeDecl} ";"
+    ;
+
+SingleTypeDecl
+    : TypeName [GenericParams] "=" TypeExpr
+    ;
+
+GenericParams
+    : "<" TypeVar {"," TypeVar} ">"
+    ;
+
+TypeVar
+    : UpperID
+    ;
+
+TypeName
+    : UpperID
+    ;
+
+LetDecl
+    : "let" SingleLetDecl {"and" SingleLetDecl} ";"
+    ;
+
+SingleLetDecl
+    : LowerID [GenericParams] ["(" [ParamList] ")"] [":" TypeExpr] "=>" Expression
+    ;
+
+Expression
+    : PrimaryExpr {ExpressionSuffix}
+    ;
+
+ExpressionSuffix
+    : ApplicationSuffix
+    | AccessSuffix
+    ;
+
+ApplicationSuffix
+    : "(" [ExpressionList] ")"
+    ;
+
+AccessSuffix
+    : "." LowerID
+    ;
+
+PrimaryExpr
+    : Lambda
+    | ConstExpr
+    | MatchExpr
+    | RecordLiteral
+    | UpperID
+    | LowerID
+    | Literal
+    | Parens
+    ;
+
+Lambda
+    : "fn" "(" [ParamList] ")" "=>" Expression
+    ;
+
+ParamList
+    : Param {"," Param}
+    ;
+
+Param
+    : LowerID [":" TypeExpr]
+    ;
+
+ConstExpr
+    : "const" LowerID "=" Expression "in" Expression
+    ;
+
+MatchExpr
+    : "match" Expression "{" MatchArm {MatchArm} "}"
+    ;
+
+MatchArm
+    : "case" Pattern "=>" Expression
+    ;
+
+Pattern
+    : RecordPattern
+    | IdentifierPattern
+    | Literal
+    ;
+
+IdentifierPattern
+    : UpperID [PatternArgs]
+    | LowerID
+    ;
+
+PatternArgs
+    : "(" [PatternFields] ")"
+    ;
+
+PatternFields
+    : Pattern {"," Pattern}
+    ;
+
+RecordPattern
+    : "rect" "{" [FieldPatternList] "}"
+    ;
+
+FieldPatternList
+    : FieldPattern {"," FieldPattern}
+    ;
+
+FieldPattern
+    : LowerID ":" Pattern
+    ;
+
+ExpressionList
+    : Expression {"," Expression}
+    ;
+
+RecordLiteral
+    : "rect" "{" [FieldList] "}"
+    ;
+
+FieldList
+    : Field {"," Field}
+    ;
+
+Field
+    : LowerID ":" Expression
+    ;
+
+Parens
+    : "(" Expression ")"
+    ;
+
+Literal
+    : LiteralString
+    | LiteralInt
+    | "True"
+    | "False"
+    ;
+
+
+TypeExpr
+    : FunctionType
+    ;
+
+FunctionType
+    : UnionType {"->" UnionType}
+    ;
+
+UnionType
+    : IntersectionType {"|" IntersectionType}
+    ;
+
+IntersectionType
+    : PrimaryType {"&" PrimaryType}
+    ;
+
+PrimaryType
+    : TypeNameType
+    | RecordType
+    | ParensType
+    | Literal
+    ;
+
+TypeNameType
+    : TypeName [TypeArgs]
+    ;
+
+TypeArgs
+    : "<" TypeExpr {"," TypeExpr} ">"
+    ;
+
+RecordType
+    : "rect" "{" [TypeFieldList] "}"
+    ;
+
+TypeFieldList
+    : TypeField {"," TypeField}
+    ;
+
+TypeField
+    : LowerID ":" TypeExpr
+    ;
+
+ParensType
+    : "(" TypeExpr ")"
+    ;
