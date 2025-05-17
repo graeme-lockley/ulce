@@ -26,19 +26,7 @@ class ConstraintGenerator {
         val bindings = mutableMapOf<AstNode, Type>()
         
         val type = when (node) {
-            is Program -> {
-                val lastType = if (node.statements.isEmpty()) {
-                    NamedType.NOTHING
-                } else {
-                    val (lastStmtType, lastStmtConstraints, lastStmtBindings) = 
-                        generateConstraints(node.statements.last(), typeEnv)
-                    constraints.addAll(lastStmtConstraints)
-                    bindings.putAll(lastStmtBindings)
-                    lastStmtType
-                }
-                bindings[node] = lastType
-                lastType
-            }
+            is Program -> TODO("Internal Error: $node")
             
             is ExprStmt -> {
                 val (exprType, exprConstraints, exprBindings) = 
@@ -52,7 +40,7 @@ class ConstraintGenerator {
             is TypeDecl -> {
                 // Process each type declaration
                 for (decl in node.declarations) {
-                    val (declType, declConstraints, declBindings) = 
+                    val (_, declConstraints, declBindings) =
                         generateConstraints(decl, typeEnv)
                     constraints.addAll(declConstraints)
                     bindings.putAll(declBindings)
@@ -65,14 +53,14 @@ class ConstraintGenerator {
                 val typeName = node.name.token.lexeme
                 
                 // Handle generic parameters if present
-                val typeParams = if (node.genericParams != null) {
-                    node.genericParams.typeVars.map { it.token.lexeme }
-                } else {
-                    emptyList()
-                }
+//                val typeParams = if (node.genericParams != null) {
+//                    node.genericParams.typeVars.map { it.token.lexeme }
+//                } else {
+//                    emptyList()
+//                }
                 
                 // Process the type expression
-                val (typeExprType, typeExprConstraints, typeExprBindings) = 
+                val (_, typeExprConstraints, typeExprBindings) =
                     generateConstraints(node.typeExpr, typeEnv)
                 constraints.addAll(typeExprConstraints)
                 bindings.putAll(typeExprBindings)
@@ -85,15 +73,39 @@ class ConstraintGenerator {
             }
             
             is LetDecl -> {
-                // Process each let declaration
+                val allBindings = mutableMapOf<AstNode, Type>()
+                val allConstraints = Constraints()
+                var currentEnv = typeEnv
+                var lastType: Type = NamedType.NOTHING
+
                 for (decl in node.declarations) {
-                    val (declType, declConstraints, declBindings) = 
-                        generateConstraints(decl, typeEnv)
-                    constraints.addAll(declConstraints)
-                    bindings.putAll(declBindings)
+                    // Generate constraints for this declaration
+                    val (declType, declConstraints, declBindings) = generateConstraints(decl, currentEnv)
+                    
+                    // Add this declaration's constraints to the running set
+                    allConstraints.addAll(declConstraints)
+                    allBindings.putAll(declBindings)
+                    
+                    // Solve constraints up to this point
+                    val solver = ConstraintSolver()
+                    val subst = solver.solve(allConstraints.getAll())
+                    
+                    // Apply substitution to this declaration's type
+                    val resolvedType = applySubst(declType, subst)
+                    
+                    // Generalize using the current environment
+                    val scheme = currentEnv.generalize(resolvedType)
+                    
+                    // Extend environment with generalized type for subsequent declarations
+                    currentEnv = currentEnv.extend(mapOf(decl.name.lexeme to scheme))
+                    
+                    // Store the resolved type for this declaration
+                    allBindings[decl] = resolvedType
+                    lastType = resolvedType
                 }
-                bindings[node] = NamedType.NOTHING
-                NamedType.NOTHING
+
+                allBindings[node] = lastType
+                return Triple(lastType, allConstraints, allBindings)
             }
             
             is SingleLetDecl -> {
@@ -103,57 +115,24 @@ class ConstraintGenerator {
                 val declType = freshTypeVar()
                 bindings[node] = declType
                 
-                // Handle parameters if present to create a function type
-                var functionType: Type = declType
-                if (node.parameterList != null) {
-                    val paramTypes = mutableListOf<Type>()
-                    val paramList = node.parameterList.paramList
-                    
-                    if (paramList != null) {
-                        val allParams = listOf(paramList.firstParam) + 
-                                        paramList.otherParams.map { it.second }
-                        
-                        for (param in allParams) {
-                            val paramType = if (param.typeAnnotation != null) {
-                                val (annotationType, annotationConstraints, annotationBindings) = 
-                                    generateConstraints(param.typeAnnotation.typeExpr, typeEnv)
-                                constraints.addAll(annotationConstraints)
-                                bindings.putAll(annotationBindings)
-                                annotationType
-                            } else {
-                                freshTypeVar()
-                            }
-                            paramTypes.add(paramType)
-                        }
-                    }
-                    
-                    // Generate constraints for the body in a new environment
-                    val bodyReturnType = freshTypeVar()
-                    val newFunctionType = FunctionType(paramTypes, bodyReturnType)
-                    constraints.addEquality(declType, newFunctionType)
-                    functionType = newFunctionType
-                }
-                
                 // Process the body expression
                 val (bodyType, bodyConstraints, bodyBindings) = 
                     generateConstraints(node.body, typeEnv)
                 constraints.addAll(bodyConstraints)
                 bindings.putAll(bodyBindings)
                 
-                // If the body is a lambda function, the let declaration should become a function type
-                if (node.body is CompoundExpression && node.body.primary is Lambda && functionType == declType) {
-                    // If we didn't have parameters in let declaration, use the lambda's type directly
-                    val lambdaType = bindings[node.body]
-                    if (lambdaType is FunctionType) {
-                        constraints.addEquality(declType, lambdaType)
+                val lambdaType = when (val body = node.body) {
+                    is CompoundExpression -> {
+                        val primary = body.primary
+                        if (primary is Lambda) {
+                            bindings[primary] ?: bodyType
+                        } else {
+                            bodyType
+                        }
                     }
-                } 
-                // If it's already a function type, constrain the return type
-                else if (functionType is FunctionType) {
-                    constraints.addEquality(functionType.returnType, bodyType)
-                } else {
-                    constraints.addEquality(declType, bodyType)
                 }
+                
+                constraints.addEquality(declType, lambdaType)
                 
                 declType
             }
@@ -217,6 +196,7 @@ class ConstraintGenerator {
                 // Create type variables for parameters
                 val paramTypes = mutableListOf<Type>()
                 val paramToType = mutableMapOf<Param, Type>()
+                val paramNameToParam = mutableMapOf<String, Param>()
                 
                 if (node.params != null) {
                     val allParams = listOf(node.params.firstParam) + 
@@ -234,6 +214,8 @@ class ConstraintGenerator {
                         }
                         paramTypes.add(paramType)
                         paramToType[param] = paramType
+                        paramNameToParam[param.name.lexeme] = param
+                        bindings[param] = paramType  // Bind the type to the param node
                     }
                 }
                 
@@ -249,6 +231,10 @@ class ConstraintGenerator {
                 // Create the function type
                 val functionType = FunctionType(paramTypes, bodyType)
                 bindings[node] = functionType
+                
+                // If the body is another lambda, we don't need to add any additional constraints
+                // The type variables will be properly unified through the constraint solving process
+                
                 functionType
             }
             
@@ -395,10 +381,8 @@ class ConstraintGenerator {
                 // Create a fresh type variable for the function result
                 val resultType = freshTypeVar()
                 
-                // Create function type for the base expression
+                // Always constrain the base to be a function type
                 val functionType = FunctionType(argTypes, resultType)
-                
-                // Using equality constraint to ensure bidirectional type flow
                 constraints.addEquality(baseType, functionType)
                 
                 bindings[suffix] = resultType
@@ -408,11 +392,12 @@ class ConstraintGenerator {
             is AccessSuffix -> {
                 val fieldName = suffix.fieldName.lexeme
                 val recordFieldType = freshTypeVar()
+                val rowVar = freshTypeVar()
                 
-                // Base must be a record with the accessed field
-                val recordType = RecordType(mapOf(fieldName to recordFieldType))
+                // Base must be a record with the accessed field and a row variable for extra fields
+                val recordType = RecordType(mapOf(fieldName to recordFieldType), rowVar)
                 
-                // Use equality for better type propagation in nested expressions
+                // Use equality constraint for record access
                 constraints.addEquality(baseType, recordType)
                 
                 bindings[suffix] = recordFieldType

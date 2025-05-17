@@ -35,7 +35,11 @@ data class TypeVariable(val id: Int) : Type() {
     override fun freeTypeVars(): Set<Int> = setOf(id)
     
     override fun applySubst(subst: Map<Int, Type>): Type = 
-        subst[id] ?: this
+        when (val t = subst[id]) {
+            null -> this
+            is TypeVariable -> t.applySubst(subst)
+            else -> t
+        }
     
     override fun pretty(): String = "T$id"
     
@@ -62,11 +66,17 @@ data class FunctionType(val paramTypes: List<Type>, val returnType: Type) : Type
     
     override fun pretty(): String {
         val paramsStr = if (paramTypes.size == 1) {
-            paramTypes[0].pretty()
+            val paramType = paramTypes[0]
+            if (paramType is FunctionType) {
+                "(${paramType.pretty()})"
+            } else {
+                paramType.pretty()
+            }
         } else {
             "(${paramTypes.joinToString(", ") { it.pretty() }})"
         }
-        return "$paramsStr -> ${returnType.pretty()}"
+        val returnStr = returnType.pretty()
+        return "$paramsStr -> $returnStr"
     }
     
     override fun occurs(typeVar: Int): Boolean =
@@ -81,21 +91,21 @@ data class FunctionType(val paramTypes: List<Type>, val returnType: Type) : Type
  * 
  * @property fields A map of field names to their types.
  */
-data class RecordType(val fields: Map<String, Type>) : Type() {
+data class RecordType(val fields: Map<String, Type>, val rowVar: TypeVariable? = null) : Type() {
     override fun freeTypeVars(): Set<Int> =
-        fields.values.flatMap { it.freeTypeVars() }.toSet()
+        fields.values.flatMap { it.freeTypeVars() }.toSet() + (rowVar?.let { setOf(it.id) } ?: emptySet())
     
     override fun applySubst(subst: Map<Int, Type>): Type =
-        RecordType(fields.mapValues { it.value.applySubst(subst) })
+        RecordType(fields.mapValues { it.value.applySubst(subst) }, rowVar?.applySubst(subst) as? TypeVariable)
     
     override fun pretty(): String =
-        "rect { ${fields.entries.joinToString(", ") { "${it.key}: ${it.value.pretty()}" }} }"
+        "rect { ${fields.entries.joinToString(", ") { "${it.key}: ${it.value.pretty()}" }}${rowVar?.let { " | ${it.pretty()}" } ?: ""} }"
     
     override fun occurs(typeVar: Int): Boolean =
-        fields.values.any { it.occurs(typeVar) }
+        fields.values.any { it.occurs(typeVar) } || (rowVar?.occurs(typeVar) ?: false)
     
     override fun toString(): String =
-        "RecordType{${fields.entries.joinToString(", ")}}"
+        "RecordType{${fields.entries.joinToString(", ")}}${rowVar?.let { " | ${it}" } ?: ""}"
 }
 
 /**

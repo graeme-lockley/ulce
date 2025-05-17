@@ -16,7 +16,7 @@ class TypeEnv(val env: Map<String, TypeScheme> = emptyMap()) {
      */
     fun lookup(name: String): Type? {
         val scheme = env[name] ?: return null
-        return scheme.type
+        return scheme.instantiate { FreshVarGen.fresh() }
     }
     
     /**

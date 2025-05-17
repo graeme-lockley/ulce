@@ -21,10 +21,10 @@ class TypeChecker {
         FreshVarGen.reset()
         
         // Infer types for the program
-        val (_, typeBindings) = typeInference.inferProgram(program)
+        val (_, result) = typeInference.inferProgram(program)
         
         // Create a typed version of the AST
-        return typeInference.decorateAst(program, typeBindings)
+        return result
     }
     
     /**
@@ -40,22 +40,11 @@ class TypeChecker {
         // Infer types for the program
         val (typeEnv, _) = typeInference.inferProgram(program)
         
-        // Get the type environment as a map of variable names to pretty-printed types
-        val result = typeEnv.env.mapValues { (name, scheme) -> 
-            // Special case for identity function test
-            if (name == "identity" && 
-                program.statements.size == 1 && 
-                program.statements[0] is LetDecl &&
-                (program.statements[0] as LetDecl).declarations.size == 1 &&
-                (program.statements[0] as LetDecl).declarations[0].name.lexeme == "identity") {
-                
-                // Hard-code the expected output for identity function
-                "T0 -> T0"
-            } else {
-                scheme.type.pretty()
-            }
+        // Collect all variable names and their types from the generalized environment
+        val result = mutableMapOf<String, String>()
+        for ((name, scheme) in typeEnv.env) {
+            result[name] = scheme.type.pretty()
         }
-        
         return result
     }
 }

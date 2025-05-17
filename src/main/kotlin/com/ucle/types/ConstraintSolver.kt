@@ -61,6 +61,7 @@ class ConstraintSolver {
                 if (occursCheck(t1.id, t2)) {
                     throw TypeError("Recursive type detected: ${t1.id} occurs in $t2")
                 }
+                // If t2 is a concrete type (like Number), use it directly
                 mapOf(t1.id to t2)
             }
             
@@ -110,9 +111,16 @@ class ConstraintSolver {
                     subst.putAll(composedSubst)
                 }
                 
-                // Handle width subtyping if needed, for now strict matching
-                if (t1.fields.keys != t2.fields.keys) {
-                    throw TypeError("Record field mismatch: ${t1.fields.keys} vs ${t2.fields.keys}")
+                // Handle row polymorphism: if t1 has a row variable, unify it with the extra fields of t2
+                if (t1.rowVar != null) {
+                    val extraFields = t2.fields.filterKeys { it !in t1.fields }
+                    if (extraFields.isNotEmpty()) {
+                        val extraRecordType = RecordType(extraFields)
+                        val rowSubst = unify(t1.rowVar, extraRecordType)
+                        val composedSubst = composeSubst(rowSubst, subst)
+                        subst.clear()
+                        subst.putAll(composedSubst)
+                    }
                 }
                 
                 subst
@@ -254,7 +262,7 @@ class ConstraintSolver {
             }
             
             sub is RecordType && sup is RecordType -> {
-                // Record subtyping: use unification for field types
+                // Record subtyping: all fields in the supertype must be in the subtype
                 val subst = mutableMapOf<Int, Type>()
                 
                 // All fields in the supertype must be in the subtype
@@ -262,9 +270,8 @@ class ConstraintSolver {
                     val subType = sub.fields[field] ?:
                         throw TypeError("Field $field not found in record $sub")
                     
-                    // Use unification instead of subtyping for field types
-                    // This ensures proper bidirectional type flow
-                    val fieldSubst = unify(
+                    // Use subtyping for field types to allow for proper type flow
+                    val fieldSubst = subtype(
                         applySubst(subType, subst),
                         applySubst(supType, subst)
                     )
@@ -273,6 +280,18 @@ class ConstraintSolver {
                     val composedSubst = composeSubst(fieldSubst, subst)
                     subst.clear()
                     subst.putAll(composedSubst)
+                }
+                
+                // Handle row polymorphism: if sub has a row variable, unify it with the extra fields of sup
+                if (sub.rowVar != null) {
+                    val extraFields = sup.fields.filterKeys { it !in sub.fields }
+                    if (extraFields.isNotEmpty()) {
+                        val extraRecordType = RecordType(extraFields)
+                        val rowSubst = subtype(sub.rowVar, extraRecordType)
+                        val composedSubst = composeSubst(rowSubst, subst)
+                        subst.clear()
+                        subst.putAll(composedSubst)
+                    }
                 }
                 
                 subst
