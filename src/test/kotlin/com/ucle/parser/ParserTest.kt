@@ -1,7 +1,7 @@
 package com.ucle.parser
 
 import com.ucle.ast.*
-import com.ucle.parse
+import com.ucle.Parser
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -13,7 +13,7 @@ class ParserTest {
     @Test
     @DisplayName("Simple Expression Statement")
     fun simpleExpressionStatement() {
-        val result = parse("x;")
+        val result = Parser.parse("x;")
         
         // Check that we have one statement
         assertEquals(1, result.statements.size)
@@ -35,7 +35,7 @@ class ParserTest {
     @Test
     @DisplayName("Simple Type Declaration")
     fun simpleTypeDeclaration() {
-        val result = parse("type Person = rect { name: String };")
+        val result = Parser.parse("type Person = rect { name: String };")
         
         // Check that we have one statement
         assertEquals(1, result.statements.size)
@@ -52,7 +52,7 @@ class ParserTest {
     @Test
     @DisplayName("Simple Let Declaration")
     fun simpleLetDeclaration() {
-        val result = parse("let x => 42;")
+        val result = Parser.parse("let x => 42;")
         
         // Check that we have one statement
         assertEquals(1, result.statements.size)
@@ -69,7 +69,7 @@ class ParserTest {
     @Test
     @DisplayName("Simple Pattern Matching")
     fun simplePatternMatching() {
-        val result = parse("match value { case x => x };")
+        val result = Parser.parse("match value { case x => x };")
         
         // Check that we have one statement
         assertEquals(1, result.statements.size)
@@ -84,7 +84,7 @@ class ParserTest {
     @DisplayName("Missing Semicolon Error")
     fun missingSemicolon() {
         assertThrows<Exception> {
-            parse("let x => 10")
+            Parser.parse("let x => 10")
         }
     }
 
@@ -97,7 +97,7 @@ class ParserTest {
         """.trimIndent()
         
         // Just check that it parses without exceptions
-        val result = parse(program)
+        val result = Parser.parse(program)
         
         // Check basic structure is correct
         assertEquals(2, result.statements.size)

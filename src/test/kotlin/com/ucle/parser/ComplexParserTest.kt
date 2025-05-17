@@ -1,7 +1,7 @@
 package com.ucle.parser
 
 import com.ucle.ast.*
-import com.ucle.parse
+import com.ucle.Parser
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -13,7 +13,7 @@ class ComplexParserTest {
     @Test
     @DisplayName("Simple Type with Record")
     fun simpleTypeWithRecord() {
-        val result = parse("""
+        val result = Parser.parse("""
             type Person = rect { 
                 name: String, 
                 age: Number
@@ -59,7 +59,7 @@ class ComplexParserTest {
     @Test
     @DisplayName("Simple Match Expression")
     fun simpleMatchExpression() {
-        val result = parse("""
+        val result = Parser.parse("""
             let checkValue => fn(n) =>
               match n {
                 case 0 => "zero"
@@ -104,7 +104,7 @@ class ComplexParserTest {
     @DisplayName("Error: Unbalanced Braces")
     fun unbalancedBraces() {
         assertThrows<Exception> {
-            parse("type Person = rect { name: String, age: Number;")
+            Parser.parse("type Person = rect { name: String, age: Number;")
         }
     }
     
@@ -112,14 +112,14 @@ class ComplexParserTest {
     @DisplayName("Error: Missing Arrow in Let Declaration")
     fun missingArrowInLetDecl() {
         assertThrows<Exception> {
-            parse("let x 42;")
+            Parser.parse("let x 42;")
         }
     }
     
     @Test
     @DisplayName("Function Call with Field Access")
     fun functionCallWithFieldAccess() {
-        val result = parse("""
+        val result = Parser.parse("""
             let x => getPerson().name;
         """.trimIndent())
         
